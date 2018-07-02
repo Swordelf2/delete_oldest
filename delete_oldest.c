@@ -83,7 +83,7 @@ int delete_oldest(char *dir_name, char *prefix, char *suffix, int days)
 
             if (S_ISREG(file_stat.st_mode)) {
                 // check the date if needed
-                if (days > 0 && difftime(time(NULL), file_stat.st_mtime) > (double) days * SECS_IN_DAY) {
+                if (days >= 0 && difftime(time(NULL), file_stat.st_mtime) > (double) days * SECS_IN_DAY) {
                     delete_file(file_name, name);
                 } else if (days == -1) {
                     if (!min_found || file_stat.st_mtime < min_time) {
