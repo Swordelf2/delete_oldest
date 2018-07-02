@@ -8,6 +8,8 @@
 #include <dirent.h>
 #include <linux/limits.h>
 
+#define _BSD_SOURCE
+
 const char HELP_STR[] = "delete_oldest deletes the oldest file in given directory with given prefix and suffix If DAYS is given then deletes all such files older than DAYS days.\n";
 const char USAGE_STR[] = "Usage: delete_oldest DIR PREFIX SUFFIX [DAYS]\n";
 
@@ -74,7 +76,7 @@ int delete_oldest(char *dir_name, char *prefix, char *suffix, int days)
             // now checkwhether it's a regualr file
             snprintf(file_name, sizeof(file_name), "%s/%s", dir_name, name);
             struct stat file_stat;
-            if (stat(file_name, &file_stat) != 0) {
+            if (lstat(file_name, &file_stat) != 0) {
                 char error_str[MAX_ERROR_STR_SIZE];
                 snprintf(error_str, sizeof(error_str), "Could not stat file %s\n", name);
                 fputs(error_str, stderr);
