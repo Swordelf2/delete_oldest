@@ -108,11 +108,14 @@ int delete_oldest(char *dir_name, char *prefix, char *suffix, int days)
 
 int delete_file(char *full_name, char *name)
 {
+    char error_str[MAX_ERROR_STR_SIZE];
     if (unlink(full_name) != 0) {
-        char error_str[MAX_ERROR_STR_SIZE];
         snprintf(error_str, sizeof(error_str), "Could not delete file %s\n", name);
         fputs(error_str, stderr);
         return -1;
+    } else {
+        snprintf(error_str, sizeof(error_str), "Deleted %s\n", name);
+        fputs(error_str, stdout);
     }
     return 0;
 }
