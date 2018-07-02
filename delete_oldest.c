@@ -46,8 +46,8 @@ int main(int argc, char *argv[])
         return delete_oldest(argv[ARG_DIR], argv[ARG_PREFIX], argv[ARG_SUFFIX], days);
     } else {
         fputs(USAGE_STR, stdout);
+        return 1;
     }
-    return 1;
 }
 
 int delete_oldest(char *dir_name, char *prefix, char *suffix, int days)
@@ -70,7 +70,7 @@ int delete_oldest(char *dir_name, char *prefix, char *suffix, int days)
         size_t name_len = strlen(name);
         // check prefix and suffix
         if (strncmp(name, prefix, pref_len) == 0 &&
-            (name_len >= suf_len && strncmp(name + name_len - suf_len, suffix, suf_len))) {
+            (name_len >= suf_len && strncmp(name + name_len - suf_len, suffix, suf_len) ==0)) {
             // now checkwhether it's a regualr file
             snprintf(file_name, sizeof(file_name), "%s/%s", dir_name, name);
             struct stat file_stat;
