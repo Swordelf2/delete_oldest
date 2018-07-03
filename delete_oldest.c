@@ -1,3 +1,6 @@
+#define _BSD_SOURCE
+#define _FILE_OFFSET_BITS 64
+
 #include <string.h>
 #include <time.h>
 #include <stdlib.h>
@@ -7,8 +10,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <linux/limits.h>
-
-#define _BSD_SOURCE
+#include <errno.h>
 
 const char HELP_STR[] = "delete_oldest deletes the oldest file in given directory with given prefix and suffix If DAYS is given then deletes all such files older than DAYS days.\n";
 const char USAGE_STR[] = "Usage: delete_oldest DIR PREFIX SUFFIX [DAYS]\n";
@@ -58,7 +60,7 @@ int delete_oldest(char *dir_name, char *prefix, char *suffix, int days)
     size_t suf_len = strlen(suffix);
     DIR *dir = opendir(dir_name);
     if (dir == NULL) {
-        fputs("Could not open director\n", stderr);
+        fprintf(stderr, "Could not open directory %s:\n%s\n", dir_name, strerror(errno));
         return -1;
     }
 
@@ -77,9 +79,7 @@ int delete_oldest(char *dir_name, char *prefix, char *suffix, int days)
             snprintf(file_name, sizeof(file_name), "%s/%s", dir_name, name);
             struct stat file_stat;
             if (lstat(file_name, &file_stat) != 0) {
-                char error_str[MAX_ERROR_STR_SIZE];
-                snprintf(error_str, sizeof(error_str), "Could not stat file %s\n", name);
-                fputs(error_str, stderr);
+                fprintf(stderr, "Could not stat file %s:\n%s\n", name, strerror(errno));
                 return -1;
             }
 
@@ -97,7 +97,7 @@ int delete_oldest(char *dir_name, char *prefix, char *suffix, int days)
         }
     }
     if (closedir(dir) != 0) {
-        fputs("Failed to close directory\n", stderr);
+        fprintf(stderr, "Failed to close directory %s\n%s\n", dir_name, strerror(errno));
         return -1;
     }
 
@@ -110,14 +110,11 @@ int delete_oldest(char *dir_name, char *prefix, char *suffix, int days)
 
 int delete_file(char *full_name, char *name)
 {
-    char error_str[MAX_ERROR_STR_SIZE];
     if (unlink(full_name) != 0) {
-        snprintf(error_str, sizeof(error_str), "Could not delete file %s\n", name);
-        fputs(error_str, stderr);
+        fprintf(stderr, "Could not delete file %s:\n%s\n", name, strerror(errno));
         return -1;
     } else {
-        snprintf(error_str, sizeof(error_str), "Deleted %s\n", name);
-        fputs(error_str, stdout);
+        printf("Deleted %s\n", name);
     }
     return 0;
 }
