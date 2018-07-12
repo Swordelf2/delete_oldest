@@ -12,28 +12,35 @@
 #include <linux/limits.h>
 #include <errno.h>
 
-const char HELP_STR[] = "delete_oldest deletes the oldest file in given directory with given prefix and suffix If DAYS is given then deletes all such files older than DAYS days.\n";
+const char HELP_STR[] = "delete_oldest deletes all files in given directory with given prefix and suffix except for PRES_COUNT most recent ones\n";
 const char USAGE_STR[] = "Usage: delete_oldest DIR PREFIX SUFFIX [DAYS]\n";
-
 
 enum Args
 {
-    ARG_CNT = 3 + 1,
+    ARG_CNT = 4 + 1,
     ARG_DIR = 1,
     ARG_PREFIX,
     ARG_SUFFIX,
-    ARG_DAYS
+    ARG_PRES_COUNT
 };
 
 enum
 {
+    MAX_FILE_CNT = 512,
     MAX_ARG_SIZE = 1024,
     MAX_ERROR_STR_SIZE = 1024,
-    SECS_IN_DAY = 24 * 60 * 60
+};
+
+struct DFile
+{
+    char *name;
+    time_t cr_time;
 };
 
 int delete_oldest(char *dir_name, char *prefix, char *suffix, int days);
 inline int delete_file(char *full_name, char *name);
+
+int compare_times(const void *dfile1, const void *dfile2);
 
 int main(int argc, char *argv[])
 {
@@ -43,18 +50,15 @@ int main(int argc, char *argv[])
         fputs(USAGE_STR, stdout);
         // provide help info
     } else if (argc >= ARG_CNT) {
-        int days = -1;
-        if (argc >= ARG_CNT + 1) {
-            days = strtol(argv[ARG_DAYS], NULL, 0);
-        }
-        return delete_oldest(argv[ARG_DIR], argv[ARG_PREFIX], argv[ARG_SUFFIX], days);
+        int pres_count = strtol(argv[ARG_PRES_COUNT], NULL, 0);
+        return delete_oldest(argv[ARG_DIR], argv[ARG_PREFIX], argv[ARG_SUFFIX], pres_count);
     } else {
         fputs(USAGE_STR, stdout);
         return 1;
     }
 }
 
-int delete_oldest(char *dir_name, char *prefix, char *suffix, int days)
+int delete_oldest(char *dir_name, char *prefix, char *suffix, int pres_count)
 {
     size_t pref_len = strlen(prefix);
     size_t suf_len = strlen(suffix);
@@ -64,10 +68,10 @@ int delete_oldest(char *dir_name, char *prefix, char *suffix, int days)
         return -1;
     }
 
+    struct DFile df_arr[MAX_FILE_CNT];
+    size_t df_arr_size = 0;
+
     struct dirent *dir_ent;
-    char min_name[PATH_MAX];
-    int min_found = 0;
-    time_t min_time = 0;
     while ((dir_ent = readdir(dir))) {
         char file_name[PATH_MAX];
         char *name = dir_ent->d_name;
@@ -75,7 +79,7 @@ int delete_oldest(char *dir_name, char *prefix, char *suffix, int days)
         // check prefix and suffix
         if (strncmp(name, prefix, pref_len) == 0 &&
             (name_len >= suf_len && strncmp(name + name_len - suf_len, suffix, suf_len) ==0)) {
-            // now checkwhether it's a regualr file
+            // now checkwhether it's a regular file
             snprintf(file_name, sizeof(file_name), "%s/%s", dir_name, name);
             struct stat file_stat;
             if (lstat(file_name, &file_stat) != 0) {
@@ -84,25 +88,31 @@ int delete_oldest(char *dir_name, char *prefix, char *suffix, int days)
             }
 
             if (S_ISREG(file_stat.st_mode)) {
-                // check the date if needed
-                if (days >= 0 && difftime(time(NULL), file_stat.st_mtime) > (double) days * SECS_IN_DAY) {
-                    delete_file(file_name, name);
-                } else if (days == -1) {
-                    if (!min_found || file_stat.st_mtime < min_time) {
-                        min_found = 1;
-                        strcpy(min_name, file_name);
-                    }
+                if (df_arr_size >= MAX_FILE_CNT) {
+                    fprintf(stderr, "Too many files, aborting");
+                    return -1;
                 }
+                df_arr[df_arr_size].name = strdup(name);
+                df_arr[df_arr_size].cr_time = file_stat.st_mtime;
+                ++df_arr_size;
             }
         }
     }
+
+    qsort(df_arr, df_arr_size, sizeof(*df_arr), compare_times);
+    for (unsigned i = pres_count; i < df_arr_size; ++i) {
+        char file_name[PATH_MAX];
+        snprintf(file_name, sizeof(file_name), "%s/%s", dir_name, df_arr[i].name);
+        delete_file(file_name, df_arr[i].name);
+    }
+
+    for (size_t i = 0; i < df_arr_size; ++i) {
+        free(df_arr[i].name);
+    }
+
     if (closedir(dir) != 0) {
         fprintf(stderr, "Failed to close directory %s\n%s\n", dir_name, strerror(errno));
         return -1;
-    }
-
-    if (min_found) {
-        delete_file(min_name, min_name);
     }
 
     return 0;
@@ -117,4 +127,17 @@ int delete_file(char *full_name, char *name)
         printf("Deleted %s\n", name);
     }
     return 0;
+}
+
+int compare_times(const void *dfile1, const void *dfile2)
+{
+    time_t t1 = ((struct DFile *) dfile1)->cr_time;
+    time_t t2 = ((struct DFile *) dfile2)->cr_time;
+    if (t1 < t2) {
+        return 1;
+    } else if (t1 == t2) {
+        return 0;
+    } else {
+        return -1;
+    }
 }
