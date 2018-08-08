@@ -114,8 +114,8 @@ int delete_files(DIR *dir, const char *dir_name)
     }
 
     perform_cleanup(files, delete, files_cnt, DAY_NUM, DAY_CNT);
-    perform_cleanup(files, delete, files_cnt, WEEK_NUM, WEEK_CNT);
     perform_cleanup(files, delete, files_cnt, MONTH_NUM, MONTH_CNT);
+    perform_cleanup(files, delete, files_cnt, WEEK_NUM, WEEK_CNT);
 
     for (unsigned i = 0; i < files_cnt; ++i) {
         if (delete[i]) {
@@ -146,7 +146,7 @@ int print_next_file(DIR *dir)
         }
     }
 
-    printf("%s%05u%s", pref_str, max_id, suf_str);
+    printf("%s%05u%s", pref_str, max_id + 1, suf_str);
     return 0;
 }
 
