@@ -29,7 +29,7 @@ enum
     WEEK_NUM = 10,
     WEEK_CNT = 1,
     DAY_NUM = 1,
-    DAY_CNT = 3
+    DAY_CNT = 5
 };
 
 struct FileID
@@ -44,7 +44,8 @@ const char suf_str[] = ".tar.gz";
 const size_t pref_len = strlen(pref_str);
 const size_t suf_len = strlen(suf_str);
 
-int delete_files(DIR *dir);
+int delete_files(DIR *dir, const char *dir_name);
+int print_next_file(DIR *dir);
 int compare_fileid(const void *f1, const void *f2);
 void perform_cleanup(struct FileID *files, int *delete, size_t files_cnt, unsigned num, unsigned cnt);
 long long check_name(const char *name);
@@ -63,9 +64,9 @@ int main(int argc, char *argv[])
     }
 
     if (argc == ARG_COUNT) {
-        delete_files(dir);
+        delete_files(dir, dir_name);
     } else {
-
+        print_next_file(dir);
     }
 
     if (closedir(dir) != 0) {
@@ -89,7 +90,7 @@ long long check_name(const char *name)
     }
 }
 
-int delete_files(DIR *dir)
+int delete_files(DIR *dir, const char *dir_name)
 {
     struct FileID files[MAX_FILE_CNT];
     size_t files_cnt = 0;
@@ -112,16 +113,40 @@ int delete_files(DIR *dir)
         delete[i] = 1;
     }
 
-    perform_cleanup(files, delete, files_cnt, MONTH_NUM, MONTH_CNT);
-    perform_cleanup(files, delete, files_cnt, WEEK_NUM, WEEK_CNT);
     perform_cleanup(files, delete, files_cnt, DAY_NUM, DAY_CNT);
+    perform_cleanup(files, delete, files_cnt, WEEK_NUM, WEEK_CNT);
+    perform_cleanup(files, delete, files_cnt, MONTH_NUM, MONTH_CNT);
 
     for (unsigned i = 0; i < files_cnt; ++i) {
-        if (!delete[i]) {
-            printf("%u ", files[i].id);
+        if (delete[i]) {
+            char path[PATH_MAX];
+            snprintf(path, sizeof(path), "%s/%s", dir_name, files[i].name);
+            if (unlink(path) == 00) {
+                printf("File %s deleted\n", files[i].name);
+            } else {
+                fprintf(stderr, "Could not delete file %s:\n%s",
+                        files[i].name, strerror(errno));
+            }
         }
     }
-    putchar('\n');
+    return 0;
+}
+
+int print_next_file(DIR *dir)
+{
+    unsigned max_id = 0;
+    struct dirent *dir_ent;
+    while ((dir_ent = readdir(dir))) {
+        char *name = dir_ent->d_name;
+        long long id = check_name(name);
+        if (id != -1) {
+            if (id > max_id) {
+                max_id = id;
+            }
+        }
+    }
+
+    printf("%s%05u%s", pref_str, max_id, suf_str);
     return 0;
 }
 
@@ -140,6 +165,7 @@ void perform_cleanup(struct FileID *files, int *delete, size_t files_cnt, unsign
         }
     }
 }
+
 
 
 int compare_fileid(const void *f1, const void *f2)
